@@ -88,6 +88,10 @@ var FacesCommands = &cli.Command{
 			},
 			Action: facesOptimizeAction,
 		},
+		FacesModelsCommand,
+		FacesRecognizeModelCommand,
+		FacesCompareModelCommand,
+		FacesPromoteModelCommand,
 		FacesConfigCommand,
 	},
 }

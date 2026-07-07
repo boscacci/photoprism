@@ -1,0 +1,6 @@
+.gitattributes text eol=lf
+*.sh text eol=lf
+**/Dockerfile text eol=lf
+**/Makefile text eol=lf
+Makefile text eol=lf
+scripts/dist/services/** text eol=lf

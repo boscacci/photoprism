@@ -4,9 +4,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/photoprism/photoprism/internal/ai/face"
 	"github.com/photoprism/photoprism/internal/ai/vision"
+	"github.com/photoprism/photoprism/pkg/fs"
 )
 
 // FaceEngine returns the configured face detection engine. When the config is
@@ -142,6 +144,43 @@ func (c *Config) FaceEngineModelPath() string {
 	}
 
 	return primary
+}
+
+// FaceRecognitionModel returns the active face recognition embedding model key.
+func (c *Config) FaceRecognitionModel() string {
+	if c == nil {
+		return face.RecognitionModelFacenet
+	}
+
+	key := face.ParseRecognitionModel(c.options.FaceRecognitionModel)
+
+	if _, ok := face.RecognitionProfileByKey(key); ok {
+		return key
+	}
+
+	return face.RecognitionModelFacenet
+}
+
+// FaceRecognitionServiceURI returns the configured GPU recognition sidecar URI.
+func (c *Config) FaceRecognitionServiceURI() string {
+	if c == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(c.options.FaceRecognitionServiceURI)
+}
+
+// FaceRecognitionModelsPath returns the directory for GPU recognition model weights.
+func (c *Config) FaceRecognitionModelsPath() string {
+	if c == nil {
+		return ""
+	}
+
+	if path := strings.TrimSpace(c.options.FaceRecognitionModelsPath); path != "" {
+		return fs.Abs(path)
+	}
+
+	return filepath.Join(c.ModelsPath(), "face-recognition")
 }
 
 // FaceSize returns the face size threshold in pixels.

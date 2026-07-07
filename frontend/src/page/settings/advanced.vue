@@ -166,6 +166,97 @@
           </v-row>
         </v-card-actions>
 
+        <template v-if="!settings.DisableFaces">
+          <v-card-title class="pb-0 text-subtitle-2">
+            {{ $gettext(`Face Recognition`) }}
+          </v-card-title>
+
+          <v-card-actions>
+            <v-row align="start" dense>
+              <v-col cols="12">
+                <v-alert v-if="faceModelsError" color="warning" icon="mdi-alert" class="mb-2 pa-2" type="warning" variant="outlined">
+                  {{ faceModelsError }}
+                </v-alert>
+
+                <v-progress-linear v-if="faceModelsBusy" indeterminate color="surface-variant" height="2" class="mb-1"></v-progress-linear>
+
+                <v-table tile hover density="compact" class="bg-table p-face-recognition-models">
+                  <thead>
+                    <tr>
+                      <th class="text-start">{{ $gettext(`Model`) }}</th>
+                      <th class="text-start">{{ $gettext(`Status`) }}</th>
+                      <th class="text-start hidden-sm-and-down">{{ $gettext(`GPU`) }}</th>
+                      <th class="text-start">{{ $gettext(`Details`) }}</th>
+                      <th class="text-end">{{ $gettext(`Actions`) }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="model in faceModels.models" :key="faceModelKey(model)" :class="{ 'is-active': model.active }">
+                      <td>
+                        <div class="font-weight-medium">{{ model.profile.name }}</div>
+                        <div class="text-caption text-medium-emphasis">{{ model.profile.key }}</div>
+                      </td>
+                      <td class="text-no-wrap">
+                        {{ faceModelStatus(model) }}
+                      </td>
+                      <td class="hidden-sm-and-down">
+                        {{ faceModelGpu(model) }}
+                      </td>
+                      <td>
+                        <div class="text-caption">{{ faceModelDetails(model) }}</div>
+                        <div v-if="faceModelCompare[faceModelKey(model)]" class="text-caption text-medium-emphasis">
+                          {{
+                            $gettextInterpolate($gettext("Changed: %{n}"), {
+                              n: faceModelCompare[faceModelKey(model)].changedSubjects,
+                            })
+                          }}
+                        </div>
+                      </td>
+                      <td class="text-end text-no-wrap">
+                        <v-btn
+                          v-tooltip="$gettext('Prepare')"
+                          icon="mdi-play-circle"
+                          density="comfortable"
+                          variant="plain"
+                          color="surface-variant"
+                          :aria-label="$gettext('Prepare')"
+                          :disabled="!canPrepareFaceModel(model)"
+                          @click.stop.prevent="onPrepareFaceModel(model)"
+                        ></v-btn>
+                        <v-btn
+                          v-tooltip="$gettext('Compare')"
+                          icon="mdi-table-eye"
+                          density="comfortable"
+                          variant="plain"
+                          color="surface-variant"
+                          :aria-label="$gettext('Compare')"
+                          :disabled="!canCompareFaceModel(model)"
+                          @click.stop.prevent="onCompareFaceModel(model)"
+                        ></v-btn>
+                        <v-btn
+                          v-tooltip="$gettext('Promote')"
+                          icon="mdi-check-decagram"
+                          density="comfortable"
+                          variant="plain"
+                          color="surface-variant"
+                          :aria-label="$gettext('Promote')"
+                          :disabled="!canPromoteFaceModel(model)"
+                          @click.stop.prevent="onPromoteFaceModel(model)"
+                        ></v-btn>
+                      </td>
+                    </tr>
+                    <tr v-if="!faceModelsBusy && faceModels.models.length === 0">
+                      <td colspan="5" class="text-medium-emphasis">
+                        {{ $gettext(`No face recognition models found.`) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </v-table>
+              </v-col>
+            </v-row>
+          </v-card-actions>
+        </template>
+
         <template v-if="!settings.DisableBackups">
           <v-card-title class="pb-0 text-subtitle-2">
             {{ $gettext(`Backup`) }}
@@ -428,6 +519,7 @@
 
 <script>
 import ConfigOptions from "model/config-options";
+import FaceRecognitionModels from "model/face-recognition-models";
 import * as options from "options/options";
 import { restart } from "common/server";
 import PAboutFooter from "component/about/footer.vue";
@@ -447,6 +539,15 @@ export default {
       config: this.$config.values,
       rtl: this.$isRtl,
       settings: new ConfigOptions(false),
+      faceModelsBusy: false,
+      faceModelAction: "",
+      faceModelsError: "",
+      faceModels: {
+        activeModel: "facenet",
+        models: [],
+      },
+      faceModelCompare: {},
+      faceModelRuns: {},
       options: options,
     };
   },
@@ -455,9 +556,180 @@ export default {
       this.$router.push({ name: "settings" });
     } else {
       this.load();
+      this.loadFaceModels();
     }
   },
   methods: {
+    // faceModelKey returns the canonical model key for UI actions.
+    faceModelKey(model) {
+      return model?.profile?.key || "";
+    },
+    // faceModelStatus returns the short availability status shown in the table.
+    faceModelStatus(model) {
+      if (model?.active) {
+        return this.$gettext("Active");
+      } else if (model?.available) {
+        return this.$gettext("Ready");
+      } else if (!model?.installed) {
+        return this.$gettext("Missing");
+      }
+
+      return this.$gettext("Blocked");
+    },
+    // faceModelGpu returns GPU metadata for a model row.
+    faceModelGpu(model) {
+      if (model?.gpuName && model?.vramMiB) {
+        return `${model.gpuName}, ${model.vramMiB} MiB`;
+      } else if (model?.vramMiB) {
+        return `${model.vramMiB} MiB`;
+      } else if (model?.profile?.minVramMiB) {
+        return this.$gettextInterpolate(this.$gettext("%{n} MiB required"), { n: model.profile.minVramMiB });
+      }
+
+      return this.$gettext("Default");
+    },
+    // faceModelDetails returns a readable reason or preparation summary.
+    faceModelDetails(model) {
+      const key = this.faceModelKey(model);
+      const run = this.faceModelRuns[key];
+
+      if (run?.status) {
+        return this.$gettextInterpolate(this.$gettext("Prepared %{n} markers"), { n: run.markerCount || 0 });
+      }
+
+      if (!model?.reasons || model.reasons.length === 0) {
+        return this.$gettext("Ready");
+      }
+
+      return model.reasons.map((reason) => this.faceModelReason(reason)).join(", ");
+    },
+    // faceModelReason returns a localized label for an availability reason.
+    faceModelReason(reason) {
+      switch (reason) {
+        case "missing_model":
+          return this.$gettext("Model files missing");
+        case "missing_gpu":
+          return this.$gettext("GPU not detected");
+        case "insufficient_vram":
+          return this.$gettext("GPU memory too small");
+        case "missing_service_uri":
+          return this.$gettext("Service URI missing");
+        case "sidecar_unhealthy":
+          return this.$gettext("Service unavailable");
+        case "incomplete_preparation":
+          return this.$gettext("Preparation incomplete");
+        default:
+          return reason;
+      }
+    },
+    // isFaceModelCandidate returns true for models that need candidate state.
+    isFaceModelCandidate(model) {
+      return this.faceModelKey(model) !== "" && this.faceModelKey(model) !== "facenet";
+    },
+    // isFaceModelPrepared returns true when the UI has seen prepared candidate state.
+    isFaceModelPrepared(model) {
+      const key = this.faceModelKey(model);
+      return this.faceModelRuns[key]?.status === "prepared" || this.faceModelCompare[key]?.prepared === true;
+    },
+    // isFaceModelAction returns true while a model action is in flight.
+    isFaceModelAction(model, action) {
+      return this.faceModelAction === `${this.faceModelKey(model)}:${action}`;
+    },
+    // canPrepareFaceModel reports whether the candidate can be prepared.
+    canPrepareFaceModel(model) {
+      return this.isFaceModelCandidate(model) && model?.available && !this.faceModelAction;
+    },
+    // canCompareFaceModel reports whether candidate comparison can be requested.
+    canCompareFaceModel(model) {
+      return this.isFaceModelCandidate(model) && !this.faceModelAction;
+    },
+    // canPromoteFaceModel reports whether the candidate can be promoted.
+    canPromoteFaceModel(model) {
+      return this.isFaceModelCandidate(model) && !model?.active && this.isFaceModelPrepared(model) && !this.faceModelAction;
+    },
+    // loadFaceModels refreshes face recognition model availability.
+    loadFaceModels() {
+      if (this.isDemo || this.isPublic) {
+        return Promise.resolve();
+      }
+
+      this.faceModelsBusy = true;
+      this.faceModelsError = "";
+
+      return FaceRecognitionModels.list()
+        .then((data) => {
+          this.faceModels = {
+            activeModel: data?.activeModel || "facenet",
+            serviceUri: data?.serviceUri || "",
+            gpuName: data?.gpuName || "",
+            vramMiB: data?.vramMiB || 0,
+            models: data?.models || [],
+          };
+        })
+        .catch(() => {
+          this.faceModelsError = this.$gettext("Face recognition models could not be loaded.");
+        })
+        .finally(() => {
+          this.faceModelsBusy = false;
+        });
+    },
+    // onPrepareFaceModel prepares candidate embeddings for a model.
+    onPrepareFaceModel(model) {
+      const key = this.faceModelKey(model);
+      if (!key || !this.canPrepareFaceModel(model)) {
+        return;
+      }
+
+      this.faceModelAction = `${key}:prepare`;
+
+      FaceRecognitionModels.recognize(key)
+        .then((run) => {
+          this.faceModelRuns = { ...this.faceModelRuns, [key]: run };
+          this.$notify.success(this.$gettext("Recognition model prepared"));
+          this.faceModelAction = "";
+          return this.onCompareFaceModel(model);
+        })
+        .finally(() => {
+          this.faceModelAction = "";
+        });
+    },
+    // onCompareFaceModel compares candidate and active recognition state.
+    onCompareFaceModel(model) {
+      const key = this.faceModelKey(model);
+      if (!key || !this.canCompareFaceModel(model)) {
+        return Promise.resolve();
+      }
+
+      this.faceModelAction = `${key}:compare`;
+
+      return FaceRecognitionModels.compare(key)
+        .then((result) => {
+          this.faceModelCompare = { ...this.faceModelCompare, [key]: result };
+        })
+        .finally(() => {
+          this.faceModelAction = "";
+        });
+    },
+    // onPromoteFaceModel promotes a prepared candidate model.
+    onPromoteFaceModel(model) {
+      const key = this.faceModelKey(model);
+      if (!key || !this.canPromoteFaceModel(model)) {
+        return;
+      }
+
+      this.faceModelAction = `${key}:promote`;
+
+      FaceRecognitionModels.promote(key)
+        .then(() => {
+          this.$notify.success(this.$gettext("Recognition model promoted"));
+          this.faceModelRuns = {};
+          this.faceModelCompare = {};
+          return this.loadFaceModels();
+        })
+        .finally(() => {
+          this.faceModelAction = "";
+        });
+    },
     onRestart() {
       this.busy = true;
       restart().finally(() => {

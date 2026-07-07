@@ -661,6 +661,10 @@
     bottom: 0;
 }
 
+.search-results.face-results .input-select {
+    visibility: visible;
+}
+
 .search-results .result:hover .preview-details,
 .search-results .result:hover .input-view,
 .search-results .result:hover .input-open,

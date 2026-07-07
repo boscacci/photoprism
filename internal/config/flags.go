@@ -1315,6 +1315,25 @@ var Flags = CliFlags{
 			Usage:   "face detection thread `COUNT` (0 uses half the available CPU cores)",
 			EnvVars: EnvVars("FACE_ENGINE_THREADS"),
 		}}, {
+		Flag: &cli.StringFlag{
+			Name:    "face-recognition-model",
+			Usage:   "active face recognition embedding model `KEY`",
+			Value:   face.RecognitionModelFacenet,
+			EnvVars: EnvVars("FACE_RECOGNITION_MODEL"),
+		}}, {
+		Flag: &cli.StringFlag{
+			Name:    "face-recognition-service-uri",
+			Usage:   "face recognition service endpoint `URI` for GPU models",
+			Value:   "",
+			EnvVars: EnvVars("FACE_RECOGNITION_SERVICE_URI"),
+		}}, {
+		Flag: &cli.PathFlag{
+			Name:      "face-recognition-models-path",
+			Usage:     "custom face recognition model weights `PATH`",
+			Value:     "",
+			EnvVars:   EnvVars("FACE_RECOGNITION_MODELS_PATH"),
+			TakesFile: true,
+		}}, {
 		Flag: &cli.IntFlag{
 			Name:    "face-size",
 			Usage:   "minimum size of faces in `PIXELS` (20-10000)",

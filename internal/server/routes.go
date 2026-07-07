@@ -183,6 +183,11 @@ func registerRoutes(router *gin.Engine, conf *config.Config) {
 
 	// Faces.
 	api.SearchFaces(APIv1)
+	api.GetFaceRecognitionModels(APIv1)
+	api.GetFaceRecognitionModel(APIv1)
+	api.RecognizeFaceRecognitionModel(APIv1)
+	api.CompareFaceRecognitionModel(APIv1)
+	api.PromoteFaceRecognitionModel(APIv1)
 	api.GetFace(APIv1)
 	api.UpdateFace(APIv1)
 

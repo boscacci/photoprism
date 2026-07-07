@@ -1,0 +1,41 @@
+## Optional GPU face recognition sidecar.
+## Usage: docker compose -f compose.yaml -f compose.face-recognition.yaml --profile face-recognition up -d
+
+services:
+  photoprism:
+    environment:
+      PHOTOPRISM_FACE_RECOGNITION_MODEL: "${PHOTOPRISM_FACE_RECOGNITION_MODEL:-facenet}"
+      PHOTOPRISM_FACE_RECOGNITION_SERVICE_URI: "http://face-recognition:5000/api/v1/vision/face"
+      PHOTOPRISM_FACE_RECOGNITION_MODELS_PATH: "${WORKING_DIR:-/go/src/github.com/photoprism/photoprism}/storage/services/face-recognition/models"
+
+  face-recognition:
+    build:
+      context: ./docker/face-recognition
+    image: photoprism/face-recognition:develop
+    profiles: ["all", "face-recognition", "vision"]
+    stop_grace_period: 15s
+    expose:
+      - 5000
+    environment:
+      FACE_RECOGNITION_MODEL: "${FACE_RECOGNITION_MODEL:-auraface-v1}"
+      FACE_RECOGNITION_MODELS_PATH: "/models"
+      FACE_RECOGNITION_AUTO_DOWNLOAD: "true"
+      FACE_RECOGNITION_REQUIRE_CUDA: "true"
+      NVIDIA_VISIBLE_DEVICES: "all"
+      NVIDIA_DRIVER_CAPABILITIES: "compute,utility"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${COMPOSE_NETWORK_NAME:-photoprism}"
+      - "traefik.http.services.face-recognition.loadbalancer.server.port=5000"
+      - "traefik.http.routers.face-recognition.entrypoints=websecure"
+      - "traefik.http.routers.face-recognition.rule=Host(`face-recognition.localssl.dev`)"
+      - "traefik.http.routers.face-recognition.tls=true"
+    volumes:
+      - "./storage/services/face-recognition/models:/models"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: "nvidia"
+              capabilities: [gpu]
+              count: "all"

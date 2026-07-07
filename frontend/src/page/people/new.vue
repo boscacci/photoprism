@@ -15,6 +15,8 @@
       <p-loading></p-loading>
     </div>
     <div v-else class="p-page__content">
+      <p-people-clipboard :refresh="refresh" :selection="selection" :clear-selection="clearSelection" search-query-prefix="face"></p-people-clipboard>
+
       <p-scroll :load-more="loadMore" :load-disabled="scrollDisabled" :load-distance="scrollDistance" :loading="loading"></p-scroll>
 
       <div v-if="results.length === 0" class="pa-3">
@@ -35,12 +37,34 @@
       </div>
       <div v-else>
         <div class="v-row search-results face-results cards-view" :class="{ 'select-results': selection.length > 0 }">
-          <div v-for="m in results" :key="m.ID" class="v-col-12 v-col-sm-6 v-col-md-4 v-col-lg-3 v-col-xl-2">
-            <div :data-id="m.ID" :class="m.classes()" class="result flex-grow-1 not-selectable">
-              <v-img :src="m.thumbnailUrl('tile_320')" aspect-ratio="1" class="preview" @click.stop.prevent="onView(m)">
+          <div v-for="(m, index) in results" :key="m.ID" class="v-col-12 v-col-sm-6 v-col-md-4 v-col-lg-3 v-col-xl-2">
+            <div :data-id="m.ID" :class="m.classes(selection.includes(m.ID))" class="result flex-grow-1 not-selectable" @contextmenu.stop="onContextMenu($event, index)">
+              <v-img
+                :src="m.thumbnailUrl('tile_320')"
+                aspect-ratio="1"
+                class="preview"
+                @touchstart.passive="input.touchStart($event, index)"
+                @touchend.stop="onClick($event, index)"
+                @mousedown.stop.prevent="input.mouseDown($event, index)"
+                @click.stop.prevent="onClick($event, index)"
+              >
                 <v-btn :ripple="false" class="input-hidden" icon variant="text" density="comfortable" position="absolute" @click.stop.prevent="toggleHidden(m)">
                   <v-icon color="white" class="select-on" :title="$gettext('Show')">mdi-eye-off</v-icon>
                   <v-icon color="white" class="select-off" :title="$gettext('Hide')">mdi-close</v-icon>
+                </v-btn>
+                <v-btn
+                  :ripple="false"
+                  icon
+                  variant="text"
+                  position="absolute"
+                  class="input-select"
+                  @touchstart.stop="input.touchStart($event, index)"
+                  @touchend.stop="onSelect($event, index)"
+                  @touchmove.stop.prevent
+                  @click.stop.prevent="onSelect($event, index)"
+                >
+                  <v-icon color="white" class="select-on">mdi-check-circle</v-icon>
+                  <v-icon color="white" class="select-off">mdi-radiobox-blank</v-icon>
                 </v-btn>
               </v-img>
 
@@ -107,11 +131,13 @@ import $notify from "common/notify";
 import { ClickLong, ClickShort, Input, InputInvalid } from "common/input";
 import { ACTION_CREATED, ACTION_UPDATED, ACTION_DELETED } from "common/event";
 import PLoading from "component/loading.vue";
+import PPeopleClipboard from "component/people/clipboard.vue";
 
 export default {
   name: "PPageFaces",
   components: {
     PLoading,
+    PPeopleClipboard,
   },
   props: {
     staticFilter: {
@@ -313,14 +339,6 @@ export default {
           this.selectRange(index, this.results);
         }
       }
-    },
-    onView(model) {
-      if (this.loading || this.busy || !this.active) {
-        // Don't redirect if page is not ready or active.
-        return;
-      }
-
-      this.$router.push(model.route(this.view));
     },
     onUpdate(ev, data) {
       if (!this.listen) {

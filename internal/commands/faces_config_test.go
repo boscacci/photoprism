@@ -16,6 +16,8 @@ func TestFacesConfigCommand(t *testing.T) {
 
 	// Spot-check face-related rows are reported.
 	assert.Contains(t, output, "face-engine")
+	assert.Contains(t, output, "face-recognition-model")
+	assert.Contains(t, output, "face-recognition-models-path")
 	assert.Contains(t, output, "face-size")
 	assert.Contains(t, output, "face-cluster-dist")
 	assert.Contains(t, output, "facenet-model-path")
@@ -54,7 +56,7 @@ func TestFacesConfigCommandJSON(t *testing.T) {
 		names[item["name"]] = item["value"]
 	}
 
-	for _, want := range []string{"face-engine", "face-size", "face-cluster-dist", "facenet-model-path"} {
+	for _, want := range []string{"face-engine", "face-recognition-model", "face-size", "face-cluster-dist", "facenet-model-path"} {
 		if _, ok := names[want]; !ok {
 			t.Errorf("expected JSON to contain %q, got keys: %v", want, names)
 		}

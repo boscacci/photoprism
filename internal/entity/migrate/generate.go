@@ -39,6 +39,9 @@ func gen_migrations(name string) {
 	fmt.Printf("generating %s...", dialect)
 
 	strToStmts := func(b []byte) (result []string) {
+		b = bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n"))
+		b = bytes.ReplaceAll(b, []byte("\r"), []byte("\n"))
+
 		stmts := bytes.Split(b, []byte(";\n"))
 		result = make([]string, 0, len(stmts))
 

@@ -257,6 +257,9 @@ type Options struct {
 	DetectNSFW                bool          `yaml:"DetectNSFW" json:"DetectNSFW" flag:"detect-nsfw"`
 	FaceEngine                string        `yaml:"FaceEngine" json:"-" flag:"face-engine"`
 	FaceEngineThreads         int           `yaml:"FaceEngineThreads" json:"-" flag:"face-engine-threads"`
+	FaceRecognitionModel      string        `yaml:"FaceRecognitionModel" json:"-" flag:"face-recognition-model"`
+	FaceRecognitionServiceURI string        `yaml:"FaceRecognitionServiceURI" json:"-" flag:"face-recognition-service-uri"`
+	FaceRecognitionModelsPath string        `yaml:"FaceRecognitionModelsPath" json:"-" flag:"face-recognition-models-path"`
 	FaceSize                  int           `yaml:"-" json:"-" flag:"face-size"`
 	FaceScore                 float64       `yaml:"-" json:"-" flag:"face-score"`
 	FaceOverlap               int           `yaml:"-" json:"-" flag:"face-overlap"`
@@ -285,7 +288,7 @@ type Options struct {
 //  2. ApplyCliContext: Which comes after Load and overrides
 //     any previous options giving an option two override file configs through the CLI.
 func NewOptions(ctx *cli.Context) *Options {
-	c := &Options{FaceEngine: face.EngineAuto}
+	c := &Options{FaceEngine: face.EngineAuto, FaceRecognitionModel: face.RecognitionModelFacenet}
 
 	// Has context?
 	if ctx == nil {

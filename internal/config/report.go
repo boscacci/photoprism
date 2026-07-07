@@ -338,6 +338,9 @@ func (c *Config) Report() (rows [][]string, cols []string) {
 		{"detect-nsfw", fmt.Sprintf("%t", c.DetectNSFW())},
 		{"face-engine", faceEngine},
 		{"face-engine-run", vision.ReportRunType(c.FaceEngineRunType())},
+		{"face-recognition-model", c.FaceRecognitionModel()},
+		{"face-recognition-service-uri", clean.UriRedacted(c.FaceRecognitionServiceURI())},
+		{"face-recognition-models-path", c.FaceRecognitionModelsPath()},
 	}...)
 
 	rows = append(rows, [][]string{
@@ -387,6 +390,9 @@ func (c *Config) FaceReport() (rows [][]string, cols []string) {
 		{"face-engine", c.FaceEngine()},
 		{"face-engine-run", vision.ReportRunType(c.FaceEngineRunType())},
 		{"face-engine-threads", fmt.Sprintf("%d", c.FaceEngineThreads())},
+		{"face-recognition-model", c.FaceRecognitionModel()},
+		{"face-recognition-service-uri", clean.UriRedacted(c.FaceRecognitionServiceURI())},
+		{"face-recognition-models-path", c.FaceRecognitionModelsPath()},
 		{"facenet-model-path", c.FacenetModelPath()},
 		{"face-size", fmt.Sprintf("%d", c.FaceSize())},
 		{"face-score", fmt.Sprintf("%f", c.FaceScore())},

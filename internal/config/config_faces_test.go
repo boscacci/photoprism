@@ -186,6 +186,37 @@ func TestConfig_FaceEngineModelPath(t *testing.T) {
 	})
 }
 
+func TestConfig_FaceRecognitionModel(t *testing.T) {
+	c := NewConfig(CliTestContext())
+	assert.Equal(t, face.RecognitionModelFacenet, c.FaceRecognitionModel())
+
+	c.options.FaceRecognitionModel = face.RecognitionModelAuraFaceV1
+	assert.Equal(t, face.RecognitionModelAuraFaceV1, c.FaceRecognitionModel())
+
+	c.options.FaceRecognitionModel = "unsupported"
+	assert.Equal(t, face.RecognitionModelFacenet, c.FaceRecognitionModel())
+}
+
+func TestConfig_FaceRecognitionServiceURI(t *testing.T) {
+	c := NewConfig(CliTestContext())
+	assert.Empty(t, c.FaceRecognitionServiceURI())
+
+	c.options.FaceRecognitionServiceURI = " http://face-recognition:5000/api/v1/vision/face "
+	assert.Equal(t, "http://face-recognition:5000/api/v1/vision/face", c.FaceRecognitionServiceURI())
+}
+
+func TestConfig_FaceRecognitionModelsPath(t *testing.T) {
+	c := NewConfig(CliTestContext())
+	tempModels := t.TempDir()
+	c.options.ModelsPath = tempModels
+
+	assert.Equal(t, filepath.Join(tempModels, "face-recognition"), c.FaceRecognitionModelsPath())
+
+	custom := filepath.Join(t.TempDir(), "weights")
+	c.options.FaceRecognitionModelsPath = custom
+	assert.Equal(t, custom, c.FaceRecognitionModelsPath())
+}
+
 func TestConfig_FaceSize(t *testing.T) {
 	c := NewConfig(CliTestContext())
 	assert.Equal(t, face.SizeThreshold, c.FaceSize())
